@@ -14,12 +14,13 @@ function generate(task) {
   const manifest = getManifest();
   const files    = Object.entries(manifest.files).sort(([a], [b]) => a.localeCompare(b));
 
+  const sealed   = files.filter(([, v]) => v.status === 'sealed');
   const locked   = files.filter(([, v]) => v.status === 'locked');
   const active   = files.filter(([, v]) => v.status === 'active');
 
   // Files that are unscoped but contain locked functions
   const fnLocked = files.filter(([, v]) => {
-    if (v.status === 'locked') return false; // already captured above
+    if (v.status === 'locked' || v.status === 'sealed') return false; // already captured
     if (!v.functions) return false;
     return Object.values(v.functions).some(f => f.status === 'locked');
   });
@@ -30,6 +31,14 @@ function generate(task) {
 
   if (task) {
     console.log(`\nTask: ${task}`);
+  }
+
+  console.log('\n--- SEALED (PRODUCTION — NEVER MODIFY, NO SELF-UNLOCK) ---');
+  if (sealed.length === 0) {
+    console.log('  (none)');
+  }
+  for (const [filePath] of sealed) {
+    console.log(`  [SEALED FILE] ${filePath}`);
   }
 
   console.log('\n--- LOCKED (DO NOT MODIFY) ---');
@@ -57,7 +66,7 @@ function generate(task) {
 
   console.log('\n--- ACTIVE (In scope for this task) ---');
   if (active.length === 0) {
-    console.log('  (none declared — use `scopelock lock` to classify files)');
+    console.log('  (none declared — use `driftlock lock` to classify files)');
   }
   for (const [filePath] of active) {
     console.log(`  [ACTIVE] ${filePath}`);
@@ -65,11 +74,13 @@ function generate(task) {
 
   console.log('\n' + '='.repeat(60));
   console.log('INSTRUCTIONS FOR THIS SESSION:');
-  console.log('1. You MUST NOT modify any [LOCKED FILE] or [LOCKED FUNCTION].');
-  console.log('2. If a locked file or function genuinely needs to change,');
-  console.log('   run: scopelock unlock <file>[:<function>] "<reason>"');
-  console.log('3. Before committing, run: scopelock check');
-  console.log('4. Scope creep = silent regressions. Stay in bounds.');
+  console.log('1. You MUST NOT modify any [SEALED FILE], [LOCKED FILE], or [LOCKED FUNCTION].');
+  console.log('2. [SEALED FILE] paths are permanent production locks. They CANNOT be self-unlocked.');
+  console.log('   They can only be released by a human via: driftlock unseal <file> --human-approved=<ticket> "<reason>"');
+  console.log('3. If a locked file or function genuinely needs to change,');
+  console.log('   run: driftlock unlock <file>[:<function>] "<reason>"');
+  console.log('4. Before committing, run: driftlock check');
+  console.log('5. Scope creep = silent regressions. Stay in bounds.');
   console.log('='.repeat(60) + '\n');
 }
 

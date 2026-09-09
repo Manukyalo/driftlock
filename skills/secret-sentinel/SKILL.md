@@ -1,6 +1,6 @@
 ---
 name: secret-sentinel
-description: "Godmode Skill: Physically blocks AI agents from committing API keys, tokens, or .env leaks. scopelock guard scans every added line in the git diff for high-entropy secrets before the commit is allowed. This is a hard block — not a warning."
+description: "Godmode Skill: Physically blocks AI agents from committing API keys, tokens, or .env leaks. driftlock guard scans every added line in the git diff for high-entropy secrets before the commit is allowed. This is a hard block — not a warning."
 ---
 
 ## Overview
@@ -20,7 +20,7 @@ The Secret Sentinel scans every newly added line for:
 
 ### Before every commit:
 ```bash
-scopelock guard
+driftlock guard
 ```
 If a secret is detected, you will see:
 ```
@@ -42,9 +42,9 @@ If a secret is detected, you will see:
 ### Intentional exception (mock/test keys only):
 If you are intentionally committing a **mock** key for testing purposes, a human must explicitly authorize it:
 ```bash
-scopelock trust test/fixtures/mock.ts "contains a mock stripe key for unit tests — not a real key"
+driftlock trust test/fixtures/mock.ts "contains a mock stripe key for unit tests — not a real key"
 ```
-This bypass is logged permanently in `.scopelock.json` for audit purposes.
+This bypass is logged permanently in `.driftlock.json` for audit purposes.
 
 ## Why this exists
 

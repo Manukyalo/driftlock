@@ -1,6 +1,6 @@
 <div align="center">
   <img src="assets/logo.png" width="200" alt="driftlock logo" />
-  <h1>driftlock v3.1</h1>
+  <h1>driftlock v3.3.3</h1>
   <p><strong>AI agent scope enforcement for production codebases.</strong></p>
 </div>
 

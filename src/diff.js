@@ -6,7 +6,7 @@
  * Parses `git diff HEAD -- <file>` output to extract the line numbers
  * (1-indexed, in the NEW version of the file) that were added or changed.
  *
- * Returned as a Set<number> for O(1) membership tests.
+ * Returned as a Map<number, string> (1-indexed line numbers to changed line content).
  */
 
 const { execSync } = require('child_process');
@@ -29,7 +29,7 @@ function getChangedLines(filePath, base = 'HEAD') {
       stdio: ['pipe', 'pipe', 'ignore'],  // suppress git's stderr in normal use
     });
   } catch {
-    return new Set();
+    return new Map();
   }
 
   if (!diffOutput.trim()) return new Map();

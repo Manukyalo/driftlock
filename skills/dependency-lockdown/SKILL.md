@@ -1,6 +1,6 @@
 ---
 name: dependency-lockdown
-description: "Godmode Skill: Prevents AI agents from silently adding or upgrading npm/pip/cargo packages. Dependency manifest files (package.json, requirements.txt, etc.) are automatically locked by scopelock on init. Any diff touching these files will fail scopelock guard until explicitly unlocked with a reason."
+description: "Godmode Skill: Prevents AI agents from silently adding or upgrading npm/pip/cargo packages. Dependency manifest files (package.json, requirements.txt, etc.) are automatically locked by driftlock on init. Any diff touching these files will fail driftlock guard until explicitly unlocked with a reason."
 ---
 
 ## Overview
@@ -9,7 +9,7 @@ Dependency drift is one of the most common and expensive agent mistakes. An agen
 
 ## How it Works
 
-On `scopelock init`, the following files are **automatically locked** without any manual action required:
+On `driftlock init`, the following files are **automatically locked** without any manual action required:
 - `package.json`, `package-lock.json`, `yarn.lock`, `pnpm-lock.yaml`
 - `requirements.txt`, `Pipfile`, `Pipfile.lock`, `poetry.lock`
 - `Cargo.toml`, `Cargo.lock`, `go.mod`, `go.sum`
@@ -19,13 +19,13 @@ On `scopelock init`, the following files are **automatically locked** without an
 ### When you need to add a dependency:
 1. You MUST explicitly unlock the manifest first with a clear reason:
    ```bash
-   scopelock unlock package.json "adding zod for runtime validation of API responses"
+   driftlock unlock package.json "adding zod for runtime validation of API responses"
    ```
 2. Make your change (add the dependency to the manifest).
-3. Run `scopelock guard` to confirm the change is authorized.
+3. Run `driftlock guard` to confirm the change is authorized.
 4. Re-lock the manifest immediately after:
    ```bash
-   scopelock lock package.json "dependencies updated and reviewed"
+   driftlock lock package.json "dependencies updated and reviewed"
    ```
 
 ### When you do NOT need a new dependency:

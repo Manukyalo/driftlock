@@ -161,7 +161,7 @@ function guard(args = []) {
   console.error(
     `\n${violations.length} violation(s) found.\n` +
     `  • Revert unintentional changes with: git restore <file>\n` +
-    `  • Explicitly unlock with:            scopelock unlock <file>[:<function>] "<reason>"`
+    `  • Explicitly unlock with:            driftlock unlock <file>[:<function>] "<reason>"`
   );
 
   process.exit(1);

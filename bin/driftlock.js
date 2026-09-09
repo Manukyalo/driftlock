@@ -9,7 +9,7 @@
  *   driftlock lock <file>[:<func>] [reason] Lock a file or function
  *   driftlock unlock <file>[:<func>] <reason> Unlock with mandatory reason
  *   driftlock context [task]                Generate AI context block
- *   driftlock check                         Verify git diff — exits 1 on violation
+ *   driftlock check                         Verify git diff (alias of 'guard') — exits 1 on violation
  *   driftlock status                        Print manifest summary
  */
 
@@ -20,7 +20,8 @@ const git      = require('../src/git');
 const blast    = require('../src/blast');
 const gateway  = require('../src/license/gateway');
 
-const [,, command, ...args] = process.argv;
+const [,, rawCommand, ...args] = process.argv;
+const command = rawCommand === 'check' ? 'guard' : rawCommand;
 
 async function run() {
   // Gating checkpoint: Check if the user is authorized to run this specific command
@@ -270,9 +271,9 @@ Account & Pro Features:
   driftlock login <key>                             Activate your Gumroad license
   driftlock logout                                  Remove local license cache
   driftlock whoami                                  Check current license status
-  driftlock scout                                   [PRO] Coming soon
-  driftlock audit                                   [PRO] Coming soon
-  driftlock godmode                                 [PRO] Coming soon
+  driftlock scout                                   [TEAM] Autonomous scan for architectural drift
+  driftlock audit [branch]                          [TEAM] Security and scope-violation audit for PRs
+  driftlock godmode <file>|--off                    [TEAM] Temporary lock override across blast radius
 
 Examples:
   driftlock lock src/auth.ts

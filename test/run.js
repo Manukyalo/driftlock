@@ -3,7 +3,7 @@
 /**
  * test/run.js
  *
- * Integration tests for scopelock V2.
+ * Integration tests for driftlock V2.
  * Sets up a real git repo in test/tmp_repo/, exercises all commands,
  * and asserts correct exit codes and output.
  */
@@ -48,8 +48,8 @@ function assert(condition, message) {
 // ─── Git repo bootstrap ───────────────────────────────────────────────────────
 
 run('git init');
-run('git config user.email "test@scopelock.dev"');
-run('git config user.name "scopelock test"');
+run('git config user.email "test@driftlock.dev"');
+run('git config user.name "driftlock test"');
 
 // Write a simple JS file with two named functions
 fs.writeFileSync('app.js', `
@@ -69,7 +69,7 @@ run('git commit -m "initial"');
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
 
-console.log('\n--- Test 1: scopelock init ---');
+console.log('\n--- Test 1: driftlock init ---');
 run(`${CLI} init`);
 assert(fs.existsSync('.driftlock.json'), '.driftlock.json was created');
 const manifest = JSON.parse(fs.readFileSync('.driftlock.json', 'utf8'));
@@ -79,7 +79,7 @@ assert(manifest.files['app.js'] !== undefined, 'app.js is tracked');
 console.log('\n--- Test 2: Dependency auto-lock (Dependency Lockdown) ---');
 assert(manifest.files['package.json'].status === 'locked', 'package.json is automatically locked on init');
 
-console.log('\n--- Test 3: scopelock status ---');
+console.log('\n--- Test 3: driftlock status ---');
 const statusOut = run(`${CLI} status`);
 assert(statusOut.includes('unscoped'), 'status shows unscoped files');
 
@@ -156,7 +156,7 @@ console.log('\n--- Test 13: Lock unknown function fails gracefully ---');
 const badLock = run(`${CLI} lock app.js:doesNotExist "testing"`, true);
 assert(badLock.includes('not found'), 'locking unknown function fails with clear message');
 
-console.log('\n--- Test 14: scopelock context output ---');
+console.log('\n--- Test 14: driftlock context output ---');
 const ctx = run(`${CLI} context "update the WIP function"`);
 assert(ctx.includes('SCOPE CONTEXT'), 'context output contains header');
 
@@ -193,7 +193,7 @@ console.log('\n--- Test 20: seal blocks regular unlock ---');
 const superUnlockOut = run(`${CLI} unlock app.js "trying to bypass"`, true);
 assert(superUnlockOut.includes('SEALED'), 'regular unlock is blocked on sealed file');
 
-console.log('\n--- Test 21: seal blocks scopelock guard ---');
+console.log('\n--- Test 21: seal blocks driftlock guard ---');
 fs.appendFileSync('app.js', '\n// rogue addition\n');
 const superCheckOut = run(`${CLI} guard`, true);
 assert(superCheckOut.includes('SEALED'), 'guard reports SEALED violation');

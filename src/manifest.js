@@ -3,7 +3,7 @@
 /**
  * src/manifest.js
  *
- * All reads and writes to .scopelock.json go through this module.
+ * All reads and writes to .driftlock.json go through this module.
  *
  * Manifest schema (V2):
  * {
@@ -11,7 +11,7 @@
  *   "files": {
  *     "src/auth.ts": {
  *       "status": "unscoped" | "locked" | "active",
- *       "functions": {                          // populated by `scopelock lock`
+ *       "functions": {                          // populated by `driftlock lock`
  *         "validateToken": {
  *           "status": "locked" | "active",
  *           "history": [{ timestamp, action, reason }]
@@ -210,7 +210,7 @@ function seal(file, reason) {
  */
 function unseal(file, ticket, reason) {
   if (!ticket || !reason) {
-    console.error('Usage: scopelock unseal <file> --human-approved=<ticket> <reason>');
+    console.error('Usage: driftlock unseal <file> --human-approved=<ticket> <reason>');
     process.exit(1);
   }
   const relativePath = file.replace(/\\/g, '/');
@@ -219,7 +219,7 @@ function unseal(file, ticket, reason) {
   const entry = manifest.files[relativePath];
 
   if (entry.status !== 'sealed') {
-    console.error(`'${relativePath}' is not sealed. Use 'scopelock unlock' instead.`);
+    console.error(`'${relativePath}' is not sealed. Use 'driftlock unlock' instead.`);
     process.exit(1);
   }
 
@@ -298,7 +298,7 @@ function status() {
     lockedFnCount += Object.values(v.functions).filter(f => f.status === 'locked').length;
   }
 
-  console.log(`\n📋  scopelock status\n`);
+  console.log(`\n📋  driftlock status\n`);
   console.log(`  🛡️   sealed    — ${sealed.length} file(s)`);
   console.log(`  🔒  locked    — ${locked.length} file(s), ${lockedFnCount} function(s)`);
   console.log(`  ✏️   active    — ${active.length} file(s)`);

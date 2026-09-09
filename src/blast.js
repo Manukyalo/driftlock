@@ -154,7 +154,7 @@ function printBlastRadius(targetFile) {
   }
   console.log('');
   console.log(`   ⚠️  Modifying '${target}' may impact all ${total} of the above file(s).`);
-  console.log(`   Run 'scopelock lock ${target}' to protect it before your session.\n`);
+  console.log(`   Run 'driftlock lock ${target}' to protect it before your session.\n`);
 }
 
 module.exports = { blastRadius, printBlastRadius };
