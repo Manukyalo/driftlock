@@ -10,6 +10,13 @@
     "test": "node test/run.js && node test/license.test.js",
     "e2e": "node test/e2e.js"
   },
+  "files": [
+    "bin",
+    "src",
+    "skills",
+    "assets",
+    "README.md"
+  ],
   "engines": {
     "node": ">=14"
   },

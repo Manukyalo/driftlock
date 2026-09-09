@@ -1,5 +1,10 @@
-# Test artifacts
-test/tmp_repo/
+# Sensitive environment secrets
+.env
+.env.*
+
+# Internal state and tests
+.driftlock.json
+test/
 
 # Dev files
 .gitignore
