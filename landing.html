@@ -716,19 +716,89 @@
 
     .plan-price {
       font-family: var(--mono);
-      font-size: 52px;
+      font-size: 44px;
       font-weight: 700;
-      letter-spacing: -0.05em;
+      letter-spacing: -0.04em;
       line-height: 1;
       color: var(--white);
-      margin-bottom: 6px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+    }
+
+    .plan-period {
+      font-size: 14px;
+      font-weight: 400;
+      color: var(--dim);
+    }
+
+    .plan-price-alt {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--mid);
+      margin-bottom: 10px;
+    }
+
+    .plan-price-alt strong {
+      color: var(--fg);
+      font-weight: 600;
     }
 
     .plan-price-note {
-      font-size: 13px;
+      font-size: 12px;
       color: var(--muted);
-      margin-bottom: 32px;
+      margin-bottom: 24px;
       font-family: var(--mono);
+    }
+
+    .billing-switch-wrap {
+      margin-bottom: 36px;
+    }
+
+    .billing-switch {
+      display: inline-flex;
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      padding: 4px;
+      gap: 4px;
+      border-radius: 4px;
+    }
+
+    .billing-opt {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--dim);
+      padding: 8px 16px;
+      cursor: pointer;
+      border-radius: 2px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.15s ease;
+    }
+
+    .billing-opt:hover {
+      color: var(--white);
+    }
+
+    .billing-opt.active {
+      background: var(--lift);
+      color: var(--white);
+      border-color: var(--muted);
+    }
+
+    .badge-discount {
+      background: var(--red-dim);
+      color: var(--red);
+      font-size: 10px;
+      padding: 2px 6px;
+      border: 1px solid rgba(255,50,50,0.3);
+      border-radius: 2px;
+      letter-spacing: 0.04em;
     }
 
     .plan-divider {
@@ -1433,8 +1503,17 @@
       License<br />tiers
     </h2>
     <p class="section-copy">
-      One-time payment. No subscriptions. License key activates instantly via <code>driftlock login &lt;key&gt;</code>.
+      Choose monthly flexibility or save 2 months with annual billing. Pro is $29/mo or $290/yr. Teams is $79/mo or $790/yr. License activates instantly via <code>driftlock login &lt;key&gt;</code>.
     </p>
+  </div>
+
+  <div class="billing-switch-wrap">
+    <div class="billing-switch" role="radiogroup" aria-label="Billing cycle">
+      <button type="button" class="billing-opt active" id="btn-billing-monthly" role="radio" aria-checked="true">MONTHLY</button>
+      <button type="button" class="billing-opt" id="btn-billing-yearly" role="radio" aria-checked="false">
+        ANNUAL <span class="badge-discount">SAVE 2 MONTHS</span>
+      </button>
+    </div>
   </div>
 
   <div class="pricing-grid">
@@ -1443,7 +1522,8 @@
     <div class="plan plan-free reveal">
       <div class="plan-tier">FREE</div>
       <div class="plan-price">$0</div>
-      <div class="plan-price-note">no card · no account</div>
+      <div class="plan-price-alt">free forever</div>
+      <div class="plan-price-note">no credit card · no account required</div>
       <div class="plan-divider"></div>
       <ul class="plan-features">
         <li><span class="pf-icon pf-yes">✓</span>init, lock, unlock, status</li>
@@ -1463,8 +1543,9 @@
     <!-- PRO -->
     <div class="plan plan-pro highlighted reveal">
       <div class="plan-tier">PRO — MOST POPULAR</div>
-      <div class="plan-price" data-gumroad-field="price">$29</div>
-      <div class="plan-price-note">one-time · yours forever</div>
+      <div class="plan-price"><span id="pro-price-num">$29</span><span class="plan-period" id="pro-price-period">/mo</span></div>
+      <div class="plan-price-alt" id="pro-price-alt">or <strong>$290/year</strong> (save $58)</div>
+      <div class="plan-price-note">1 developer seat · billed monthly or annually</div>
       <div class="plan-divider"></div>
       <ul class="plan-features">
         <li><span class="pf-icon pf-yes">✓</span>Everything in Free</li>
@@ -1476,16 +1557,17 @@
         <li class="locked"><span class="pf-icon pf-no">—</span>scout — autonomous scanning</li>
         <li class="locked"><span class="pf-icon pf-no">—</span>audit — branch PR review</li>
       </ul>
-      <a href="https://kyalovibes.gumroad.com/l/lzozc" class="plan-cta" data-gumroad-action="buy" data-gumroad-option="Pro" id="buy-pro" aria-label="Buy driftlock Pro license for $29">
+      <a href="https://kyalovibes.gumroad.com/l/lzozc" class="plan-cta" data-gumroad-action="buy" data-gumroad-option="Pro" id="buy-pro" aria-label="Buy driftlock Pro license — $29/mo or $290/year">
         Get Pro license →
       </a>
     </div>
 
     <!-- TEAM -->
     <div class="plan plan-team reveal">
-      <div class="plan-tier">TEAM</div>
-      <div class="plan-price" data-gumroad-field="price">$79</div>
-      <div class="plan-price-note">one-time · unlimited seats</div>
+      <div class="plan-tier">TEAMS</div>
+      <div class="plan-price"><span id="team-price-num">$79</span><span class="plan-period" id="team-price-period">/mo</span></div>
+      <div class="plan-price-alt" id="team-price-alt">or <strong>$790/year</strong> (save $158)</div>
+      <div class="plan-price-note">Up to 5 seats · billed monthly or annually</div>
       <div class="plan-divider"></div>
       <ul class="plan-features">
         <li><span class="pf-icon pf-yes">✓</span>Everything in Pro</li>
@@ -1493,12 +1575,12 @@
         <li><span class="pf-icon pf-yes">✓</span>audit — AI-driven PR branch review</li>
         <li><span class="pf-icon pf-yes">✓</span>godmode — cross-file refactoring</li>
         <li><span class="pf-icon pf-yes">✓</span>trust — security override bypass</li>
-        <li><span class="pf-icon pf-yes">✓</span>Unlimited team members</li>
+        <li><span class="pf-icon pf-yes">✓</span>Team repository enforcement</li>
         <li><span class="pf-icon pf-yes">✓</span>Priority support</li>
-        <li><span class="pf-icon pf-yes">✓</span>All future commands in Team tier</li>
+        <li><span class="pf-icon pf-yes">✓</span>All future Team commands</li>
       </ul>
-      <a href="https://kyalovibes.gumroad.com/l/lzozc" class="plan-cta" data-gumroad-action="buy" data-gumroad-option="Teams" id="buy-team" aria-label="Buy driftlock Team license for $79">
-        Get Team license →
+      <a href="https://kyalovibes.gumroad.com/l/lzozc" class="plan-cta" data-gumroad-action="buy" data-gumroad-option="Teams" id="buy-team" aria-label="Buy driftlock Teams license — $79/mo or $790/year">
+        Get Teams license →
       </a>
     </div>
 
@@ -1586,10 +1668,10 @@
 
     <div class="cta-buttons">
       <a href="https://kyalovibes.gumroad.com/l/lzozc" class="btn-primary" data-gumroad-action="buy" data-gumroad-option="Pro" id="buy-cta-pro" aria-label="Buy driftlock Pro">
-        Get Pro — $29 one-time
+        Get Pro — $29/mo or $290/yr
       </a>
       <a href="https://kyalovibes.gumroad.com/l/lzozc" class="btn-ghost" data-gumroad-action="buy" data-gumroad-option="Teams" id="buy-cta-team" aria-label="Buy driftlock Team license">
-        Team license — $79
+        Teams — $79/mo or $790/yr
       </a>
     </div>
   </div>
@@ -1637,6 +1719,44 @@
   document.getElementById('copy-install').addEventListener('click', function () {
     copyText('npm install -g driftlock');
   });
+
+  /* ── BILLING CYCLE TOGGLE ── */
+  var btnMonthly = document.getElementById('btn-billing-monthly');
+  var btnYearly = document.getElementById('btn-billing-yearly');
+  var proNum = document.getElementById('pro-price-num');
+  var proPeriod = document.getElementById('pro-price-period');
+  var proAlt = document.getElementById('pro-price-alt');
+  var teamNum = document.getElementById('team-price-num');
+  var teamPeriod = document.getElementById('team-price-period');
+  var teamAlt = document.getElementById('team-price-alt');
+
+  if (btnMonthly && btnYearly) {
+    btnMonthly.addEventListener('click', function () {
+      btnMonthly.classList.add('active');
+      btnMonthly.setAttribute('aria-checked', 'true');
+      btnYearly.classList.remove('active');
+      btnYearly.setAttribute('aria-checked', 'false');
+      if (proNum) proNum.textContent = '$29';
+      if (proPeriod) proPeriod.textContent = '/mo';
+      if (proAlt) proAlt.innerHTML = 'or <strong>$290/year</strong> (save $58)';
+      if (teamNum) teamNum.textContent = '$79';
+      if (teamPeriod) teamPeriod.textContent = '/mo';
+      if (teamAlt) teamAlt.innerHTML = 'or <strong>$790/year</strong> (save $158)';
+    });
+
+    btnYearly.addEventListener('click', function () {
+      btnYearly.classList.add('active');
+      btnYearly.setAttribute('aria-checked', 'true');
+      btnMonthly.classList.remove('active');
+      btnMonthly.setAttribute('aria-checked', 'false');
+      if (proNum) proNum.textContent = '$290';
+      if (proPeriod) proPeriod.textContent = '/yr';
+      if (proAlt) proAlt.innerHTML = 'equiv. <strong>$24.17/mo</strong> (2 months free)';
+      if (teamNum) teamNum.textContent = '$790';
+      if (teamPeriod) teamPeriod.textContent = '/yr';
+      if (teamAlt) teamAlt.innerHTML = 'equiv. <strong>$65.83/mo</strong> (2 months free)';
+    });
+  }
 
   /* ── SCROLL REVEAL ── */
   var io = new IntersectionObserver(function (entries) {
