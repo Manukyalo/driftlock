@@ -1,0 +1,1680 @@
+<!--
+  THESIS: driftlock is a physical interlock on AI agents — a commit-blocking enforcement layer.
+  This page refuses the AI-tool dark-mode default (purple glow, gradient text, floating orbs)
+  and instead reads like industrial safety documentation: precise, authoritative, red for violations.
+
+  OWN-WORLD: #0A0A0A ground, #FF3232 violation-red sole accent, Geist Mono display type,
+  Geist body — the terminal palette. No gradient text. No decorative blur. No eyebrow labels.
+  Borders draw structure; color carries meaning.
+
+  STORY: Engineer lands, sees their production codebase as something that can be locked.
+  They understand the tier they need, click buy, and leave with a key.
+
+  FIRST VIEWPORT: Full-bleed terminal-style header — product name in mono at 8–10rem,
+  single-line status indicator (SCOPE: ENFORCED), one line of copy, two actions.
+  Primary action right-aligned at desktop, full-width on mobile.
+
+  FORM: Industrial data sheet / safety manual. Grid-anchored, sparse, purposeful red.
+  Seed: manual direction — driftlock enforcement infrastructure world.
+
+  FINISH: unreviewed and undocumented is unfinished;
+  this build ends with the finish review, the verdict, and DESIGN.md
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="driftlock — CLI tool that hard-blocks AI agents from modifying files outside their authorized scope. Pre-commit enforcement, secret scanning, rollback snapshots." />
+  <title>driftlock — Scope enforcement for AI agents</title>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@300;400;500;600;700&family=Geist:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <style>
+    /* ─── TOKENS ─────────────────────────────────────────── */
+    :root {
+      --black:   #0A0A0A;
+      --surface: #111111;
+      --lift:    #1A1A1A;
+      --rule:    #252525;
+      --muted:   #3A3A3A;
+      --mid:     #666666;
+      --dim:     #888888;
+      --fg:      #E8E8E8;
+      --white:   #F5F5F5;
+      --red:     #FF3232;
+      --red-dim: #3A0A0A;
+      --green:   #22C55E;
+
+      --mono: 'Geist Mono', 'Courier New', monospace;
+      --sans: 'Geist', system-ui, sans-serif;
+
+      --ease-lock: cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    /* ─── RESET ──────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; font-size: 16px; }
+
+    body {
+      font-family: var(--sans);
+      background: var(--black);
+      color: var(--fg);
+      line-height: 1.6;
+      overflow-x: hidden;
+      /* Custom scrollbar */
+      scrollbar-width: thin;
+      scrollbar-color: var(--muted) var(--black);
+    }
+
+    ::selection { background: var(--red); color: var(--white); }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--black); }
+    ::-webkit-scrollbar-thumb { background: var(--muted); }
+
+    /* ─── TYPE SCALE ─────────────────────────────────────── */
+    code, .mono {
+      font-family: var(--mono);
+      font-size: 0.875em;
+    }
+
+    /* ─── NAV ────────────────────────────────────────────── */
+    .nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 32px;
+      height: 52px;
+      border-bottom: 1px solid var(--rule);
+      background: rgba(10,10,10,0.92);
+      backdrop-filter: blur(8px);
+    }
+
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--white);
+      text-decoration: none;
+      letter-spacing: -0.01em;
+    }
+
+    .nav-brand img {
+      width: 24px;
+      height: 24px;
+      border-radius: 4px;
+      object-fit: cover;
+    }
+
+    .nav-status {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--dim);
+      letter-spacing: 0.08em;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: blink 3s ease-in-out infinite;
+    }
+
+    @keyframes blink {
+      0%, 90%, 100% { opacity: 1; }
+      95% { opacity: 0.2; }
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .nav-link {
+      font-size: 13px;
+      color: var(--dim);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .nav-link:hover { color: var(--white); }
+
+    .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 16px;
+      background: var(--white);
+      color: var(--black);
+      border: none;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s;
+      letter-spacing: 0.02em;
+    }
+    .nav-btn:hover { background: var(--red); color: var(--white); }
+
+    /* ─── HERO ───────────────────────────────────────────── */
+    .hero {
+      min-height: 100vh;
+      padding: 52px 0 0;
+      display: flex;
+      flex-direction: column;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .hero-inner {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+      padding: 80px 32px 64px;
+      gap: 64px;
+      align-items: center;
+    }
+
+    .hero-left {
+      opacity: 0;
+      transform: translateY(20px);
+      animation: enter 0.7s var(--ease-lock) 0.1s forwards;
+    }
+
+    .hero-eyeline {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      color: var(--dim);
+    }
+
+    .hero-eyeline-rule {
+      flex: 1;
+      height: 1px;
+      background: var(--rule);
+    }
+
+    .violation-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 10px;
+      background: var(--red-dim);
+      border: 1px solid rgba(255,50,50,0.3);
+      border-radius: 3px;
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--red);
+      letter-spacing: 0.08em;
+    }
+
+    .violation-badge::before {
+      content: '';
+      width: 5px;
+      height: 5px;
+      background: var(--red);
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .hero-heading {
+      font-family: var(--mono);
+      font-size: clamp(48px, 6.5vw, 88px);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 0.95;
+      color: var(--white);
+      margin-bottom: 28px;
+    }
+
+    .hero-heading .blocked {
+      color: var(--red);
+      display: block;
+      position: relative;
+    }
+
+    .hero-copy {
+      font-size: 16px;
+      color: var(--dim);
+      line-height: 1.7;
+      max-width: 440px;
+      margin-bottom: 40px;
+    }
+
+    .hero-copy strong { color: var(--fg); font-weight: 500; }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .btn-primary {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      background: var(--red);
+      color: var(--white);
+      border: none;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s;
+      letter-spacing: 0.02em;
+    }
+    .btn-primary:hover { background: #FF5555; transform: translateY(-1px); }
+
+    .btn-ghost {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      background: transparent;
+      color: var(--dim);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s;
+      letter-spacing: 0.02em;
+    }
+    .btn-ghost:hover { border-color: var(--mid); color: var(--fg); }
+
+    /* ─── HERO RIGHT: TERMINAL ───────────────────────────── */
+    .hero-right {
+      opacity: 0;
+      transform: translateY(20px);
+      animation: enter 0.7s var(--ease-lock) 0.25s forwards;
+    }
+
+    .terminal {
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      border-radius: 8px;
+      overflow: hidden;
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 14px;
+      background: var(--lift);
+      border-bottom: 1px solid var(--rule);
+    }
+
+    .t-dot {
+      width: 10px; height: 10px; border-radius: 50%;
+    }
+    .t-dot-r { background: #FF5F57; }
+    .t-dot-y { background: #FFBD2E; }
+    .t-dot-g { background: #28CA41; }
+
+    .terminal-title {
+      font-size: 11px;
+      color: var(--mid);
+      margin-left: 6px;
+      letter-spacing: 0.04em;
+    }
+
+    .terminal-body {
+      padding: 20px;
+      line-height: 1.9;
+    }
+
+    .t-line { display: flex; align-items: flex-start; gap: 8px; }
+    .t-prompt { color: var(--muted); flex-shrink: 0; }
+    .t-cmd { color: var(--fg); }
+    .t-arg { color: #7DD3FC; }
+    .t-file { color: #86EFAC; }
+    .t-string { color: #FDE68A; }
+    .t-output { color: var(--mid); padding-left: 16px; }
+    .t-error { color: var(--red); padding-left: 16px; font-weight: 600; }
+    .t-success { color: var(--green); padding-left: 16px; }
+    .t-blank { height: 10px; }
+    .t-cursor {
+      display: inline-block;
+      width: 8px;
+      height: 14px;
+      background: var(--fg);
+      vertical-align: middle;
+      animation: cursor-blink 1.1s step-end infinite;
+    }
+    @keyframes cursor-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0; }
+    }
+
+    /* ─── HERO BOTTOM: STATS ─────────────────────────────── */
+    .hero-stats {
+      border-top: 1px solid var(--rule);
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      max-width: 1200px;
+      margin: 0 auto;
+      width: 100%;
+      padding: 0 32px;
+    }
+
+    .hero-stat {
+      padding: 24px 0;
+      border-right: 1px solid var(--rule);
+      padding-left: 32px;
+    }
+    .hero-stat:first-child { padding-left: 0; }
+    .hero-stat:last-child { border-right: none; }
+
+    .stat-val {
+      font-family: var(--mono);
+      font-size: 28px;
+      font-weight: 700;
+      color: var(--white);
+      letter-spacing: -0.04em;
+    }
+
+    .stat-val .unit {
+      font-size: 16px;
+      color: var(--mid);
+      font-weight: 400;
+    }
+
+    .stat-desc {
+      font-size: 13px;
+      color: var(--dim);
+      margin-top: 2px;
+    }
+
+    /* ─── SECTION LAYOUT ─────────────────────────────────── */
+    .section {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 80px 32px;
+      border-bottom: 1px solid var(--rule);
+    }
+
+    /* ─── SECTION HEADER ─────────────────────────────────── */
+    .section-header {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: end;
+      margin-bottom: 56px;
+    }
+
+    .section-heading {
+      font-family: var(--mono);
+      font-size: clamp(28px, 3.5vw, 44px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      color: var(--white);
+    }
+
+    .section-copy {
+      font-size: 15px;
+      color: var(--dim);
+      line-height: 1.75;
+      max-width: 440px;
+    }
+
+    .section-copy strong { color: var(--fg); font-weight: 500; }
+
+    /* ─── PROBLEM ROWS ───────────────────────────────────── */
+    .problem-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .problem-row {
+      display: grid;
+      grid-template-columns: 48px 1fr auto;
+      gap: 24px;
+      align-items: start;
+      padding: 28px 0;
+      border-top: 1px solid var(--rule);
+      transition: background 0.15s;
+    }
+
+    .problem-row:last-child { border-bottom: 1px solid var(--rule); }
+
+    .problem-num {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--muted);
+      letter-spacing: 0.08em;
+      padding-top: 3px;
+    }
+
+    .problem-content h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--white);
+      margin-bottom: 6px;
+      letter-spacing: -0.01em;
+    }
+
+    .problem-content p {
+      font-size: 14px;
+      color: var(--dim);
+      line-height: 1.65;
+      max-width: 520px;
+    }
+
+    .problem-severity {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.1em;
+      padding: 3px 8px;
+      border-radius: 2px;
+      white-space: nowrap;
+      margin-top: 3px;
+      flex-shrink: 0;
+    }
+
+    .sev-critical { background: var(--red-dim); color: var(--red); border: 1px solid rgba(255,50,50,0.2); }
+    .sev-high { background: rgba(251,146,60,0.08); color: #FB923C; border: 1px solid rgba(251,146,60,0.2); }
+    .sev-medium { background: rgba(250,204,21,0.06); color: #FACC15; border: 1px solid rgba(250,204,21,0.15); }
+
+    /* ─── HOW IT WORKS ───────────────────────────────────── */
+    .steps-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--rule);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .step-cell {
+      background: var(--black);
+      padding: 36px 32px;
+      position: relative;
+    }
+
+    .step-cell:hover { background: var(--surface); }
+
+    .step-index {
+      font-family: var(--mono);
+      font-size: 10px;
+      letter-spacing: 0.14em;
+      color: var(--muted);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .step-index::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--rule);
+    }
+
+    .step-cell h3 {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--white);
+      margin-bottom: 10px;
+      letter-spacing: -0.01em;
+    }
+
+    .step-cell p {
+      font-size: 14px;
+      color: var(--dim);
+      line-height: 1.65;
+      margin-bottom: 20px;
+    }
+
+    .code-line {
+      display: flex;
+      gap: 8px;
+      font-family: var(--mono);
+      font-size: 12px;
+      padding: 8px 12px;
+      background: var(--lift);
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      margin-bottom: 6px;
+      align-items: center;
+    }
+
+    .code-line:last-child { margin-bottom: 0; }
+
+    .cl-prompt { color: var(--muted); }
+    .cl-cmd { color: var(--fg); }
+    .cl-arg { color: #7DD3FC; }
+    .cl-path { color: #86EFAC; }
+    .cl-out { color: var(--dim); }
+    .cl-ok { color: var(--green); }
+    .cl-err { color: var(--red); font-weight: 600; }
+
+    /* ─── FEATURE TABLE ──────────────────────────────────── */
+    .feature-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    .feature-table thead tr {
+      border-bottom: 2px solid var(--rule);
+    }
+
+    .feature-table th {
+      padding: 12px 16px;
+      text-align: left;
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.1em;
+      color: var(--mid);
+      font-weight: 500;
+    }
+
+    .feature-table th:first-child { padding-left: 0; }
+    .feature-table th:not(:first-child) { text-align: center; }
+
+    .feature-table tbody tr {
+      border-bottom: 1px solid var(--rule);
+      transition: background 0.1s;
+    }
+
+    .feature-table tbody tr:hover { background: var(--surface); }
+    .feature-table tbody tr:last-child { border-bottom: none; }
+
+    .feature-table td {
+      padding: 14px 16px;
+      color: var(--dim);
+      vertical-align: middle;
+    }
+
+    .feature-table td:first-child {
+      padding-left: 0;
+      color: var(--fg);
+      font-weight: 500;
+    }
+
+    .feature-table td:not(:first-child) { text-align: center; }
+
+    .ft-desc {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+      font-weight: 400;
+    }
+
+    .check { color: var(--green); font-size: 15px; }
+    .cross { color: var(--muted); font-size: 15px; }
+
+    .tier-badge {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 2px;
+      letter-spacing: 0.08em;
+    }
+
+    .tier-free { color: var(--green); background: rgba(34,197,94,0.08); border: 1px solid rgba(34,197,94,0.2); }
+    .tier-pro { color: #FB923C; background: rgba(251,146,60,0.08); border: 1px solid rgba(251,146,60,0.2); }
+    .tier-team { color: #60A5FA; background: rgba(96,165,250,0.08); border: 1px solid rgba(96,165,250,0.2); }
+
+    /* ─── AI SKILLS ──────────────────────────────────────── */
+    .skills-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1px;
+      background: var(--rule);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .skill-item {
+      background: var(--black);
+      padding: 24px;
+      transition: background 0.15s;
+    }
+
+    .skill-item:hover { background: var(--surface); }
+
+    .skill-name {
+      font-family: var(--mono);
+      font-size: 12px;
+      color: var(--fg);
+      font-weight: 500;
+      margin-bottom: 6px;
+    }
+
+    .skill-desc {
+      font-size: 13px;
+      color: var(--dim);
+      line-height: 1.5;
+    }
+
+    /* ─── PRICING ────────────────────────────────────────── */
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1px;
+      background: var(--rule);
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .plan {
+      background: var(--black);
+      padding: 40px 32px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .plan.highlighted {
+      background: var(--surface);
+    }
+
+    .plan-tier {
+      font-family: var(--mono);
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+
+    .plan-free .plan-tier { color: var(--green); }
+    .plan-pro  .plan-tier { color: #FB923C; }
+    .plan-team .plan-tier { color: #60A5FA; }
+
+    .plan-price {
+      font-family: var(--mono);
+      font-size: 52px;
+      font-weight: 700;
+      letter-spacing: -0.05em;
+      line-height: 1;
+      color: var(--white);
+      margin-bottom: 6px;
+    }
+
+    .plan-price-note {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 32px;
+      font-family: var(--mono);
+    }
+
+    .plan-divider {
+      height: 1px;
+      background: var(--rule);
+      margin-bottom: 28px;
+    }
+
+    .plan-features {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+      margin-bottom: 32px;
+    }
+
+    .plan-features li {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--dim);
+      line-height: 1.45;
+    }
+
+    .plan-features li .pf-icon {
+      flex-shrink: 0;
+      width: 16px;
+      margin-top: 1px;
+      font-family: var(--mono);
+      font-size: 12px;
+    }
+
+    .pf-yes { color: var(--green); }
+    .pf-no  { color: var(--muted); }
+
+    .plan-features li.locked { opacity: 0.4; }
+
+    .plan-cta {
+      display: block;
+      width: 100%;
+      padding: 13px 20px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.15s;
+      letter-spacing: 0.02em;
+      border: none;
+    }
+
+    .plan-free .plan-cta {
+      background: var(--lift);
+      color: var(--fg);
+      border: 1px solid var(--rule);
+    }
+    .plan-free .plan-cta:hover { border-color: var(--green); color: var(--green); }
+
+    .plan-pro .plan-cta {
+      background: #FB923C;
+      color: var(--black);
+    }
+    .plan-pro .plan-cta:hover { background: #FDBA74; transform: translateY(-1px); }
+
+    .plan-team .plan-cta {
+      background: #60A5FA;
+      color: var(--black);
+    }
+    .plan-team .plan-cta:hover { background: #93C5FD; transform: translateY(-1px); }
+
+    /* ─── QUOTE ──────────────────────────────────────────── */
+    .quote-section {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 80px 32px;
+      border-bottom: 1px solid var(--rule);
+      display: grid;
+      grid-template-columns: 4px 1fr;
+      gap: 40px;
+      align-items: start;
+    }
+
+    .quote-rule { background: var(--red); border-radius: 2px; }
+
+    .quote-text {
+      font-family: var(--mono);
+      font-size: clamp(18px, 2.5vw, 28px);
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1.5;
+      color: var(--fg);
+    }
+
+    .quote-attr {
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 20px;
+      font-family: var(--sans);
+    }
+
+    /* ─── FAQ ────────────────────────────────────────────── */
+    .faq-list {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .faq-item {
+      border-top: 1px solid var(--rule);
+    }
+    .faq-item:last-child { border-bottom: 1px solid var(--rule); }
+
+    .faq-q {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 24px;
+      padding: 22px 0;
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-align: left;
+      color: var(--white);
+      font-size: 15px;
+      font-weight: 500;
+      font-family: var(--sans);
+      transition: color 0.15s;
+    }
+
+    .faq-q:hover { color: var(--white); }
+
+    .faq-q .faq-icon {
+      width: 20px;
+      height: 20px;
+      border: 1px solid var(--rule);
+      border-radius: 3px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--mono);
+      font-size: 14px;
+      color: var(--mid);
+      flex-shrink: 0;
+      transition: all 0.2s;
+    }
+
+    .faq-item.open .faq-icon {
+      background: var(--red);
+      border-color: var(--red);
+      color: var(--white);
+      transform: rotate(45deg);
+    }
+
+    .faq-a {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s var(--ease-lock);
+    }
+
+    .faq-a-inner {
+      padding: 0 0 24px;
+      font-size: 14px;
+      color: var(--dim);
+      line-height: 1.75;
+      max-width: 680px;
+    }
+
+    .faq-a-inner code {
+      background: var(--lift);
+      border: 1px solid var(--rule);
+      padding: 1px 6px;
+      border-radius: 3px;
+      font-size: 12px;
+      color: var(--fg);
+    }
+
+    /* ─── CTA ────────────────────────────────────────────── */
+    .cta-section {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 100px 32px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+    }
+
+    .cta-heading {
+      font-family: var(--mono);
+      font-size: clamp(32px, 4vw, 52px);
+      font-weight: 700;
+      letter-spacing: -0.04em;
+      line-height: 1.05;
+      color: var(--white);
+    }
+
+    .cta-heading .red { color: var(--red); }
+
+    .cta-right {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .cta-desc {
+      font-size: 15px;
+      color: var(--dim);
+      line-height: 1.7;
+      margin-bottom: 8px;
+    }
+
+    .cta-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .install-block {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      border: 1px solid var(--rule);
+      border-radius: 4px;
+      overflow: hidden;
+      font-family: var(--mono);
+      font-size: 13px;
+    }
+
+    .install-block .install-cmd {
+      padding: 11px 16px;
+      color: var(--fg);
+      background: var(--surface);
+      flex: 1;
+    }
+
+    .install-block .install-cmd .pmt { color: var(--muted); }
+    .install-block .install-cmd .pkg { color: var(--green); }
+
+    .install-copy {
+      padding: 11px 14px;
+      background: var(--lift);
+      border-left: 1px solid var(--rule);
+      cursor: pointer;
+      color: var(--mid);
+      font-size: 12px;
+      transition: all 0.15s;
+      border: none;
+    }
+    .install-copy:hover { background: var(--muted); color: var(--white); }
+
+    /* ─── FOOTER ─────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--rule);
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 32px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .footer-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--mono);
+      font-size: 13px;
+      color: var(--dim);
+    }
+
+    .footer-brand img {
+      width: 20px;
+      height: 20px;
+      border-radius: 3px;
+      object-fit: cover;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 24px;
+    }
+
+    .footer-links a {
+      font-size: 13px;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+    .footer-links a:hover { color: var(--fg); }
+
+    .footer-copy {
+      font-size: 12px;
+      color: var(--muted);
+      font-family: var(--mono);
+    }
+
+    /* ─── TOAST ──────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      background: var(--surface);
+      border: 1px solid var(--rule);
+      color: var(--fg);
+      padding: 10px 20px;
+      border-radius: 4px;
+      font-family: var(--mono);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      opacity: 0;
+      transition: all 0.2s var(--ease-lock);
+      pointer-events: none;
+      z-index: 9999;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ─── REVEAL ─────────────────────────────────────────── */
+    @keyframes enter {
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .reveal {
+      opacity: 0;
+      transform: translateY(16px);
+      transition: opacity 0.55s var(--ease-lock), transform 0.55s var(--ease-lock);
+    }
+    .reveal.visible { opacity: 1; transform: none; }
+
+    /* ─── RESPONSIVE ─────────────────────────────────────── */
+    @media (max-width: 900px) {
+      .hero-inner { grid-template-columns: 1fr; padding: 56px 24px 40px; }
+      .hero-stats { grid-template-columns: repeat(2, 1fr); padding: 0 24px; }
+      .hero-stat { padding: 20px 0; padding-left: 0; border-right: none; border-bottom: 1px solid var(--rule); }
+      .hero-stat:nth-child(odd) { border-right: 1px solid var(--rule); padding-left: 0; padding-right: 24px; }
+      .section { padding: 60px 24px; }
+      .section-header { grid-template-columns: 1fr; gap: 20px; }
+      .steps-grid { grid-template-columns: 1fr; }
+      .pricing-grid { grid-template-columns: 1fr; }
+      .cta-section { grid-template-columns: 1fr; gap: 32px; }
+      .quote-section { padding: 56px 24px; }
+    }
+
+    @media (max-width: 640px) {
+      .nav { padding: 0 20px; }
+      .nav-status { display: none; }
+      .hero-heading { font-size: 52px; }
+      .hero-stats { grid-template-columns: repeat(2, 1fr); }
+      footer { padding: 24px 20px; }
+      .footer-links { gap: 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav" aria-label="Main navigation">
+  <a href="#" class="nav-brand" aria-label="driftlock home">
+    <img id="nav-logo" src="https://public-files.gumroad.com/4jiem6mhbte3btqiqz82jfta4m04" alt="driftlock" />
+    driftlock
+  </a>
+  <div class="nav-status" aria-label="System status">
+    <span class="status-dot" aria-hidden="true"></span>
+    SCOPE: ENFORCED
+  </div>
+  <div class="nav-right">
+    <a href="#how-it-works" class="nav-link">Docs</a>
+    <a href="#pricing" class="nav-link">Pricing</a>
+    <a href="https://kyalovibes.gumroad.com/l/lzozc" class="nav-btn" data-gumroad-action="buy" data-gumroad-option="Pro" id="nav-buy">Get license →</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero" aria-labelledby="hero-heading">
+  <div class="hero-inner">
+
+    <div class="hero-left">
+      <div class="hero-eyeline" aria-hidden="true">
+        <span>v3.3.4</span>
+        <span class="hero-eyeline-rule"></span>
+        <span>SCOPE ENFORCEMENT CLI</span>
+      </div>
+
+      <h1 class="hero-heading" id="hero-heading">
+        AI agents<br />get
+        <span class="blocked">blocked.</span>
+      </h1>
+
+      <p class="hero-copy">
+        driftlock installs a <strong>pre-commit hook that hard-blocks AI agents</strong> from touching files outside their authorized scope. Lock files, seal production paths, catch secret leaks — before they reach git.
+      </p>
+
+      <div class="hero-actions">
+        <a href="https://kyalovibes.gumroad.com/l/lzozc" class="btn-primary" data-gumroad-action="buy" data-gumroad-option="Pro" id="hero-buy-pro" aria-label="Get driftlock Pro license">
+          Get Pro license
+        </a>
+        <a href="#how-it-works" class="btn-ghost" aria-label="See how driftlock works">
+          See how it works
+        </a>
+      </div>
+    </div>
+
+    <div class="hero-right">
+      <div class="terminal" role="region" aria-label="driftlock terminal demonstration">
+        <div class="terminal-bar" aria-hidden="true">
+          <span class="t-dot t-dot-r"></span>
+          <span class="t-dot t-dot-y"></span>
+          <span class="t-dot t-dot-g"></span>
+          <span class="terminal-title">zsh — driftlock</span>
+        </div>
+        <div class="terminal-body">
+          <div class="t-line"><span class="t-prompt">$</span><span class="t-cmd"> driftlock <span class="t-arg">init</span></span></div>
+          <div class="t-output">✓ Scanned 247 files — manifest written</div>
+          <div class="t-output">✓ pre-commit hook installed</div>
+          <div class="t-blank"></div>
+          <div class="t-line"><span class="t-prompt">$</span><span class="t-cmd"> driftlock <span class="t-arg">seal</span> <span class="t-file">src/billing/charge.js</span> <span class="t-string">"production billing"</span></span></div>
+          <div class="t-output">✓ Sealed — requires human-approved ticket to unseal</div>
+          <div class="t-blank"></div>
+          <div class="t-line"><span class="t-prompt">$</span><span class="t-cmd"> git commit -m <span class="t-string">"fix checkout"</span></span></div>
+          <div class="t-blank"></div>
+          <div class="t-error">✗ SCOPE VIOLATION DETECTED</div>
+          <div class="t-error">  src/billing/charge.js is sealed</div>
+          <div class="t-error">  Commit blocked.</div>
+          <div class="t-blank"></div>
+          <div class="t-line"><span class="t-prompt">$</span><span class="t-cursor" aria-hidden="true"></span></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="hero-stats" role="region" aria-label="Key metrics">
+    <div class="hero-stat">
+      <div class="stat-val">15<span class="unit"> cmds</span></div>
+      <div class="stat-desc">Across 3 license tiers</div>
+    </div>
+    <div class="hero-stat">
+      <div class="stat-val">7</div>
+      <div class="stat-desc">Native AI Skills included</div>
+    </div>
+    <div class="hero-stat">
+      <div class="stat-val">0</div>
+      <div class="stat-desc">False negatives on sealed paths</div>
+    </div>
+    <div class="hero-stat">
+      <div class="stat-val">60<span class="unit"> sec</span></div>
+      <div class="stat-desc">From install to first lock</div>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section class="section reveal" aria-labelledby="problem-heading">
+  <div class="section-header">
+    <h2 class="section-heading" id="problem-heading">
+      The ungoverned<br />agent problem
+    </h2>
+    <p class="section-copy">
+      AI agents are given write access to your entire codebase. Without enforcement, every session is a liability.
+    </p>
+  </div>
+
+  <div class="problem-list" role="list">
+    <div class="problem-row reveal" role="listitem">
+      <div class="problem-num">01</div>
+      <div class="problem-content">
+        <h3>Scope creep</h3>
+        <p>An agent asked to fix a CSS bug rewrites billing logic, migrates the database schema, and adds three new dependencies — in the same commit.</p>
+      </div>
+      <span class="problem-severity sev-critical" aria-label="Severity: Critical">CRITICAL</span>
+    </div>
+    <div class="problem-row reveal" role="listitem">
+      <div class="problem-num">02</div>
+      <div class="problem-content">
+        <h3>Secret leaks</h3>
+        <p>Agents hallucinate valid-looking credentials and commit AWS keys, Stripe tokens, and <code>.env</code> contents directly to git history — silently, with no error.</p>
+      </div>
+      <span class="problem-severity sev-critical" aria-label="Severity: Critical">CRITICAL</span>
+    </div>
+    <div class="problem-row reveal" role="listitem">
+      <div class="problem-num">03</div>
+      <div class="problem-content">
+        <h3>No persistent memory</h3>
+        <p>Every session starts blank. The architectural decisions made last week don't exist. The agent invents its own — often contradicting the ones already in the codebase.</p>
+      </div>
+      <span class="problem-severity sev-high" aria-label="Severity: High">HIGH</span>
+    </div>
+    <div class="problem-row reveal" role="listitem">
+      <div class="problem-num">04</div>
+      <div class="problem-content">
+        <h3>Dependency drift</h3>
+        <p>Agents add, replace, and remove packages without checking what's already present — silently breaking builds and introducing supply-chain vulnerabilities.</p>
+      </div>
+      <span class="problem-severity sev-medium" aria-label="Severity: Medium">MEDIUM</span>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section reveal" id="how-it-works" aria-labelledby="how-heading">
+  <div class="section-header">
+    <h2 class="section-heading" id="how-heading">
+      How the<br />lock works
+    </h2>
+    <p class="section-copy">
+      A git pre-commit hook is the enforcement point. No agent can override it — the commit is hard-rejected before it reaches the index.
+    </p>
+  </div>
+
+  <div class="steps-grid">
+    <div class="step-cell reveal">
+      <div class="step-index">STEP 01</div>
+      <h3>Install &amp; initialise</h3>
+      <p>Scan your repo, write the manifest, wire the hook. One command.</p>
+      <div class="code-line"><span class="cl-prompt">$</span><span class="cl-cmd"> npm install -g driftlock</span></div>
+      <div class="code-line"><span class="cl-prompt">$</span><span class="cl-cmd"> driftlock </span><span class="cl-arg">init</span></div>
+      <div class="code-line"><span class="cl-out">✓ pre-commit hook installed</span></div>
+    </div>
+
+    <div class="step-cell reveal">
+      <div class="step-index">STEP 02</div>
+      <h3>Lock &amp; seal critical paths</h3>
+      <p>Lock files, or individual AST-level functions. Seal production paths — sealed files require a human-approved ticket to open.</p>
+      <div class="code-line"><span class="cl-prompt">$</span><span class="cl-cmd"> driftlock </span><span class="cl-arg">lock </span><span class="cl-path">src/auth/verify.js</span></div>
+      <div class="code-line"><span class="cl-prompt">$</span><span class="cl-cmd"> driftlock </span><span class="cl-arg">seal </span><span class="cl-path">src/billing/</span></div>
+    </div>
+
+    <div class="step-cell reveal">
+      <div class="step-index">STEP 03</div>
+      <h3>Agents get a scope map</h3>
+      <p>Before starting, agents run <code>driftlock context</code> to receive a token-efficient map of locked vs. active boundaries to inject into their system prompt.</p>
+      <div class="code-line"><span class="cl-prompt">$</span><span class="cl-cmd"> driftlock </span><span class="cl-arg">context </span><span class="cl-path">"fix checkout UI"</span></div>
+      <div class="code-line"><span class="cl-out">→ Scope map written to .driftlock-context</span></div>
+    </div>
+
+    <div class="step-cell reveal">
+      <div class="step-index">STEP 04</div>
+      <h3>Violations are hard-blocked</h3>
+      <p>The pre-commit hook intercepts the commit, checks every changed file against the manifest, and rejects the commit with a clear violation report.</p>
+      <div class="code-line"><span class="cl-err">✗ SCOPE VIOLATION</span></div>
+      <div class="code-line"><span class="cl-err">  src/billing/ is sealed</span></div>
+      <div class="code-line"><span class="cl-err">  Commit rejected.</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES TABLE -->
+<section class="section reveal" aria-labelledby="features-heading">
+  <div class="section-header">
+    <h2 class="section-heading" id="features-heading">
+      Commands<br />&amp; tiers
+    </h2>
+    <p class="section-copy">
+      All commands are gated by license tier. Free features install with no key required.
+    </p>
+  </div>
+
+  <table class="feature-table" role="table" aria-label="Feature comparison by tier">
+    <thead>
+      <tr>
+        <th scope="col">Command / Feature</th>
+        <th scope="col">Free</th>
+        <th scope="col">Pro</th>
+        <th scope="col">Team</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><span>init, lock, unlock, status</span><div class="ft-desc">Core repo scanning and file locks</div></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+      </tr>
+      <tr>
+        <td><span>guard</span><div class="ft-desc">Check git diff for violations &amp; secret leaks</div></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+      </tr>
+      <tr>
+        <td><span>Secret Sentinel</span><div class="ft-desc">Block AWS keys, tokens, .env commits</div></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+      </tr>
+      <tr>
+        <td><span>save / restore</span><div class="ft-desc">Rollback snapshots before agent sessions</div></td>
+        <td><span class="cross" aria-label="Not included">—</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+      </tr>
+      <tr>
+        <td><span>impact &lt;file&gt;</span><div class="ft-desc">Blast radius — show all files that import this file</div></td>
+        <td><span class="cross" aria-label="Not included">—</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+      </tr>
+      <tr>
+        <td><span>context [task]</span><div class="ft-desc">Generate AI context block for agent system prompts</div></td>
+        <td><span class="cross" aria-label="Not included">—</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+      </tr>
+      <tr>
+        <td><span>seal / unseal</span><div class="ft-desc">Permanent locks requiring human-approved tickets</div></td>
+        <td><span class="cross" aria-label="Not included">—</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+      </tr>
+      <tr>
+        <td><span>scout</span><div class="ft-desc">Autonomous repo scanning for architectural drift</div></td>
+        <td><span class="cross" aria-label="Not included">—</span></td>
+        <td><span class="cross" aria-label="Not included">—</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+      </tr>
+      <tr>
+        <td><span>audit &lt;branch&gt;</span><div class="ft-desc">AI-driven scope-violation auditing for team PRs</div></td>
+        <td><span class="cross" aria-label="Not included">—</span></td>
+        <td><span class="cross" aria-label="Not included">—</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+      </tr>
+      <tr>
+        <td><span>godmode &lt;file&gt;</span><div class="ft-desc">Cross-file refactoring with automated boundary expansion</div></td>
+        <td><span class="cross" aria-label="Not included">—</span></td>
+        <td><span class="cross" aria-label="Not included">—</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+      </tr>
+      <tr>
+        <td><span>7 native AI Skills</span><div class="ft-desc">Drop-in skill files for Claude, Cline, Antigravity</div></td>
+        <td><span class="cross" aria-label="Not included">—</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+        <td><span class="check" aria-label="Included">✓</span></td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- AI SKILLS -->
+<section class="section reveal" aria-labelledby="skills-heading">
+  <div class="section-header">
+    <h2 class="section-heading" id="skills-heading">
+      7 native<br />AI skills
+    </h2>
+    <p class="section-copy">
+      Markdown-based skill files for agent frameworks. Point your AI at the <code>skills/</code> directory — it learns how to use driftlock safely without any configuration.
+    </p>
+  </div>
+
+  <div class="skills-grid" role="list">
+    <div class="skill-item reveal" role="listitem">
+      <div class="skill-name">scope-enforcement</div>
+      <div class="skill-desc">Instructs agents on scope boundaries and how to generate their own context map before starting work</div>
+    </div>
+    <div class="skill-item reveal" role="listitem">
+      <div class="skill-name">secret-sentinel</div>
+      <div class="skill-desc">Teaches agents to never generate or commit credential strings, tokens, or environment secrets</div>
+    </div>
+    <div class="skill-item reveal" role="listitem">
+      <div class="skill-name">dependency-lockdown</div>
+      <div class="skill-desc">Zero-trust package management — agents check what's locked before adding, removing, or replacing packages</div>
+    </div>
+    <div class="skill-item reveal" role="listitem">
+      <div class="skill-name">test-coverage-gate</div>
+      <div class="skill-desc">Strict enforcement that blocks source code changes not accompanied by corresponding tests</div>
+    </div>
+    <div class="skill-item reveal" role="listitem">
+      <div class="skill-name">rollback-snapshot</div>
+      <div class="skill-desc">Protocol for taking a snapshot before every session and restoring it when the agent hallucinates</div>
+    </div>
+    <div class="skill-item reveal" role="listitem">
+      <div class="skill-name">blast-radius</div>
+      <div class="skill-desc">Teaches agents to run an impact check before touching any file to understand downstream consequences</div>
+    </div>
+    <div class="skill-item reveal" role="listitem">
+      <div class="skill-name">production-path-lock</div>
+      <div class="skill-desc">Protocol for sealed paths — agents learn that sealed files require a human-approved ticket, never a workaround</div>
+    </div>
+  </div>
+</section>
+
+<!-- QUOTE -->
+<blockquote class="quote-section reveal">
+  <div class="quote-rule" aria-hidden="true"></div>
+  <div>
+    <p class="quote-text">
+      "The pre-commit hook is not a suggestion.<br />It is a physical interlock. Agents cannot commit to sealed paths — the same way you cannot override a circuit breaker by convincing it nicely."
+    </p>
+    <p class="quote-attr">— driftlock design principle · built for teams shipping AI-assisted code to production</p>
+  </div>
+</blockquote>
+
+<!-- PRICING -->
+<section class="section reveal" id="pricing" aria-labelledby="pricing-heading">
+  <div class="section-header">
+    <h2 class="section-heading" id="pricing-heading">
+      License<br />tiers
+    </h2>
+    <p class="section-copy">
+      One-time payment. No subscriptions. License key activates instantly via <code>driftlock login &lt;key&gt;</code>.
+    </p>
+  </div>
+
+  <div class="pricing-grid">
+
+    <!-- FREE -->
+    <div class="plan plan-free reveal">
+      <div class="plan-tier">FREE</div>
+      <div class="plan-price">$0</div>
+      <div class="plan-price-note">no card · no account</div>
+      <div class="plan-divider"></div>
+      <ul class="plan-features">
+        <li><span class="pf-icon pf-yes">✓</span>init, lock, unlock, status</li>
+        <li><span class="pf-icon pf-yes">✓</span>guard — diff &amp; violation check</li>
+        <li><span class="pf-icon pf-yes">✓</span>Secret Sentinel scanner</li>
+        <li><span class="pf-icon pf-yes">✓</span>Test coverage gate</li>
+        <li><span class="pf-icon pf-yes">✓</span>Dependency lockdown</li>
+        <li class="locked"><span class="pf-icon pf-no">—</span>Rollback snapshots</li>
+        <li class="locked"><span class="pf-icon pf-no">—</span>Blast radius map</li>
+        <li class="locked"><span class="pf-icon pf-no">—</span>AI context generation</li>
+      </ul>
+      <a href="https://kyalovibes.gumroad.com/l/lzozc" class="plan-cta" data-gumroad-action="buy" data-gumroad-option="Free" id="buy-free" aria-label="Install driftlock free tier">
+        npm install -g driftlock
+      </a>
+    </div>
+
+    <!-- PRO -->
+    <div class="plan plan-pro highlighted reveal">
+      <div class="plan-tier">PRO — MOST POPULAR</div>
+      <div class="plan-price" data-gumroad-field="price">$29</div>
+      <div class="plan-price-note">one-time · yours forever</div>
+      <div class="plan-divider"></div>
+      <ul class="plan-features">
+        <li><span class="pf-icon pf-yes">✓</span>Everything in Free</li>
+        <li><span class="pf-icon pf-yes">✓</span>save / restore — rollback snapshots</li>
+        <li><span class="pf-icon pf-yes">✓</span>impact — blast radius analysis</li>
+        <li><span class="pf-icon pf-yes">✓</span>context — AI scope generation</li>
+        <li><span class="pf-icon pf-yes">✓</span>seal / unseal — production locks</li>
+        <li><span class="pf-icon pf-yes">✓</span>7 native AI skills</li>
+        <li class="locked"><span class="pf-icon pf-no">—</span>scout — autonomous scanning</li>
+        <li class="locked"><span class="pf-icon pf-no">—</span>audit — branch PR review</li>
+      </ul>
+      <a href="https://kyalovibes.gumroad.com/l/lzozc" class="plan-cta" data-gumroad-action="buy" data-gumroad-option="Pro" id="buy-pro" aria-label="Buy driftlock Pro license for $29">
+        Get Pro license →
+      </a>
+    </div>
+
+    <!-- TEAM -->
+    <div class="plan plan-team reveal">
+      <div class="plan-tier">TEAM</div>
+      <div class="plan-price" data-gumroad-field="price">$79</div>
+      <div class="plan-price-note">one-time · unlimited seats</div>
+      <div class="plan-divider"></div>
+      <ul class="plan-features">
+        <li><span class="pf-icon pf-yes">✓</span>Everything in Pro</li>
+        <li><span class="pf-icon pf-yes">✓</span>scout — architectural drift detection</li>
+        <li><span class="pf-icon pf-yes">✓</span>audit — AI-driven PR branch review</li>
+        <li><span class="pf-icon pf-yes">✓</span>godmode — cross-file refactoring</li>
+        <li><span class="pf-icon pf-yes">✓</span>trust — security override bypass</li>
+        <li><span class="pf-icon pf-yes">✓</span>Unlimited team members</li>
+        <li><span class="pf-icon pf-yes">✓</span>Priority support</li>
+        <li><span class="pf-icon pf-yes">✓</span>All future commands in Team tier</li>
+      </ul>
+      <a href="https://kyalovibes.gumroad.com/l/lzozc" class="plan-cta" data-gumroad-action="buy" data-gumroad-option="Teams" id="buy-team" aria-label="Buy driftlock Team license for $79">
+        Get Team license →
+      </a>
+    </div>
+
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="section reveal" id="faq" aria-labelledby="faq-heading">
+  <div class="section-header">
+    <h2 class="section-heading" id="faq-heading">
+      Common<br />questions
+    </h2>
+  </div>
+
+  <div class="faq-list" role="list">
+    <div class="faq-item" role="listitem">
+      <button class="faq-q" aria-expanded="false" aria-controls="faq1-body">
+        How does license activation work?
+        <span class="faq-icon" aria-hidden="true">+</span>
+      </button>
+      <div class="faq-a" id="faq1-body" role="region">
+        <div class="faq-a-inner">After purchase on Gumroad, you receive a unique license key by email. Run <code>driftlock login &lt;your-key&gt;</code> in any repository — the key is verified against Gumroad's API and your tier is cached locally. No account required. Run <code>driftlock whoami</code> to confirm your tier.</div>
+      </div>
+    </div>
+
+    <div class="faq-item" role="listitem">
+      <button class="faq-q" aria-expanded="false" aria-controls="faq2-body">
+        Does it work with Cursor, Cline, GitHub Copilot, and Antigravity?
+        <span class="faq-icon" aria-hidden="true">+</span>
+      </button>
+      <div class="faq-a" id="faq2-body" role="region">
+        <div class="faq-a-inner">Yes — enforcement happens at the git pre-commit level, so it works with any AI tool regardless of which editor or agent framework you use. The 7 native AI Skills ship as markdown files that Claude, Cline, and Antigravity IDE can consume directly via their skills/context systems.</div>
+      </div>
+    </div>
+
+    <div class="faq-item" role="listitem">
+      <button class="faq-q" aria-expanded="false" aria-controls="faq3-body">
+        What's the difference between a locked file and a sealed file?
+        <span class="faq-icon" aria-hidden="true">+</span>
+      </button>
+      <div class="faq-a" id="faq3-body" role="region">
+        <div class="faq-a-inner">A <strong>locked</strong> file can be unlocked by any developer who provides a reason — it's a soft guardrail. A <strong>sealed</strong> file requires an explicit human-approved ticket (<code>driftlock unseal --human-approved=&lt;ticket&gt;</code>). Seals are for billing paths, auth systems, and any code where an AI mistake would be a production incident.</div>
+      </div>
+    </div>
+
+    <div class="faq-item" role="listitem">
+      <button class="faq-q" aria-expanded="false" aria-controls="faq4-body">
+        Is the Team license per seat or per organization?
+        <span class="faq-icon" aria-hidden="true">+</span>
+      </button>
+      <div class="faq-a" id="faq4-body" role="region">
+        <div class="faq-a-inner">One license key covers your entire organization — unlimited seats. The key is shared across all developers working in the same repo or org. No per-seat billing, no annual renewals, no user management overhead.</div>
+      </div>
+    </div>
+
+    <div class="faq-item" role="listitem">
+      <button class="faq-q" aria-expanded="false" aria-controls="faq5-body">
+        Does driftlock send my code to any external service?
+        <span class="faq-icon" aria-hidden="true">+</span>
+      </button>
+      <div class="faq-a" id="faq5-body" role="region">
+        <div class="faq-a-inner">No code, file contents, or diffs ever leave your machine. The only network call driftlock makes is to Gumroad's license verification API, sending only your license key and product ID. All enforcement — scope checks, secret scanning, commit blocking — runs entirely locally via the git hook.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section reveal" aria-labelledby="cta-heading">
+  <h2 class="cta-heading" id="cta-heading">
+    Your agents<br />ship tonight.<br /><span class="red">Lock it down first.</span>
+  </h2>
+
+  <div class="cta-right">
+    <p class="cta-desc">
+      driftlock is the difference between controlled, auditable AI changes and a production incident at 2&nbsp;AM. Install in 60 seconds.
+    </p>
+
+    <div class="install-block" role="region" aria-label="Install command">
+      <div class="install-cmd">
+        <span class="pmt">$</span> npm install -g <span class="pkg">driftlock</span>
+      </div>
+      <button class="install-copy" id="copy-install" aria-label="Copy install command" title="Copy">⧉</button>
+    </div>
+
+    <div class="cta-buttons">
+      <a href="https://kyalovibes.gumroad.com/l/lzozc" class="btn-primary" data-gumroad-action="buy" data-gumroad-option="Pro" id="buy-cta-pro" aria-label="Buy driftlock Pro">
+        Get Pro — $29 one-time
+      </a>
+      <a href="https://kyalovibes.gumroad.com/l/lzozc" class="btn-ghost" data-gumroad-action="buy" data-gumroad-option="Teams" id="buy-cta-team" aria-label="Buy driftlock Team license">
+        Team license — $79
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-brand">
+    <img id="footer-logo" src="https://public-files.gumroad.com/4jiem6mhbte3btqiqz82jfta4m04" alt="driftlock" />
+    driftlock v3.3.4
+  </div>
+  <nav class="footer-links" aria-label="Footer navigation">
+    <a href="https://www.npmjs.com/package/driftlock">npm</a>
+    <a href="https://kyalovibes.gumroad.com/l/lzozc">Gumroad</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#faq">FAQ</a>
+  </nav>
+  <p class="footer-copy">© 2026 Emmanuel · MIT</p>
+</footer>
+
+<div class="toast" id="toast" role="status" aria-live="polite">copied to clipboard</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ── LOGO ── */
+  var logoUrl = 'https://public-files.gumroad.com/4jiem6mhbte3btqiqz82jfta4m04';
+  if (logoUrl) {
+    var uri = logoUrl;
+    ['nav-logo','footer-logo'].forEach(function (id) {
+      var el = document.getElementById(id); if (el) el.src = uri;
+    });
+  }
+
+  /* ── COPY ── */
+  function copyText(text) {
+    if (navigator.clipboard) { navigator.clipboard.writeText(text).catch(function(){}); }
+    else { var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); }
+    var t = document.getElementById('toast');
+    t.classList.add('show');
+    setTimeout(function () { t.classList.remove('show'); }, 2000);
+  }
+
+  document.getElementById('copy-install').addEventListener('click', function () {
+    copyText('npm install -g driftlock');
+  });
+
+  /* ── SCROLL REVEAL ── */
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) { e.target.classList.add('visible'); io.unobserve(e.target); }
+    });
+  }, { threshold: 0.06, rootMargin: '0px 0px -32px 0px' });
+  document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+
+  /* ── FAQ ACCORDION ── */
+  document.querySelectorAll('.faq-q').forEach(function (btn) {
+    function toggle() {
+      var item = btn.closest('.faq-item');
+      var ans  = item.querySelector('.faq-a');
+      var open = item.classList.contains('open');
+      document.querySelectorAll('.faq-item.open').forEach(function (o) {
+        o.classList.remove('open');
+        o.querySelector('.faq-a').style.maxHeight = '0';
+        o.querySelector('.faq-q').setAttribute('aria-expanded', 'false');
+      });
+      if (!open) {
+        item.classList.add('open');
+        ans.style.maxHeight = ans.scrollHeight + 'px';
+        btn.setAttribute('aria-expanded', 'true');
+      }
+    }
+    btn.addEventListener('click', toggle);
+    btn.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+  });
+
+  /* ── SMOOTH SCROLL ── */
+  document.querySelectorAll('a[href^="#"]').forEach(function (a) {
+    a.addEventListener('click', function (e) {
+      var t = document.querySelector(this.getAttribute('href'));
+      if (t) { e.preventDefault(); t.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+    });
+  });
+}());
+</script>
+</body>
+</html>
